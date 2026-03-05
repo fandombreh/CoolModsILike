@@ -453,18 +453,18 @@
       <div class="card-accent"></div>
       <div class="card-body">
         <div class="card-top">
-          <div class="card-icon">🛡️</div>
-          <div class="card-badges"><span class="badge badge-safe">SECURITY</span><span class="badge badge-util">UTILITY</span></div>
+          <div class="card-icon">🌙</div>
+          <div class="card-badges"><span class="badge badge-new">NEW</span><span class="badge badge-util">UTILITY</span></div>
         </div>
-        <div class="card-name">StopBackdooring GoodMenus</div>
+        <div class="card-name">Seralyth MenuUnConsoled</div>
         <div class="card-type">.DLL · BEPINEX MOD</div>
-        <p class="card-desc">Protects your client from malicious backdoor injections found in sketchy menus. Essential security mod — keeps your account and system safe while browsing community mods.</p>
+        <p class="card-desc">A sleek utility mod that unlocks and enhances menu functionality in Gorilla Tag. Clean, polished, and built for a smoother experience straight out of the box.</p>
         <div class="card-meta">
-          <div class="meta-item"><span class="meta-key">Type</span><span class="meta-val">Security</span></div>
+          <div class="meta-item"><span class="meta-key">Type</span><span class="meta-val">Utility</span></div>
           <div class="meta-item"><span class="meta-key">Format</span><span class="meta-val">.DLL</span></div>
-          <div class="meta-item"><span class="meta-key">Source</span><span class="meta-val">Discord</span></div>
+          <div class="meta-item"><span class="meta-key">Source</span><span class="meta-val">Upload</span></div>
         </div>
-        <a href="https://cdn.discordapp.com/attachments/1476364032385744907/1476364033010434099/StopBackdooringGoodMenus.dll?ex=69aa1526&is=69a8c3a6&hm=bf868bf9ef223f6c90f88e31cf66c8e1aa21a9a6a8d3c6fdfa0c79c9c8eb2342&" class="download-btn" download>
+        <a href="/Seralyth-MenuUnConsoled.dll" class="download-btn" download="Seralyth-MenuUnConsoled.dll">
           <svg class="btn-icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Download Mod</span>
         </a>
@@ -632,6 +632,7 @@
   // ── Live Online Counter ──────────────────────────────────────────
   const SESSION_ID = 'sess_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
   const HEARTBEAT  = 20000; // ms
+  let failCount = 0;
 
   function bumpEl(el) {
     el.classList.add('bump');
@@ -639,18 +640,13 @@
   }
 
   function setOnline(n) {
-    if (n === null) return; // storage unavailable — keep current display
-    const a = document.getElementById('onlineCount');
-    const b = document.getElementById('onlineCountStat');
+    const a   = document.getElementById('onlineCount');
+    const b   = document.getElementById('onlineCountStat');
     const dot = document.getElementById('onlineDot');
-
     const prev = parseInt(a.textContent) || 0;
     if (n !== prev) { bumpEl(a); if (b) bumpEl(b); }
-
     a.textContent = n;
     if (b) b.textContent = n;
-
-    // Make the dot "live" once we have a real number
     dot.classList.remove('loading');
   }
 
@@ -661,31 +657,35 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: SESSION_ID, action: 'heartbeat' })
       });
+      if (!r.ok) throw new Error('bad status');
       const data = await r.json();
-      setOnline(data.online);
+      if (typeof data.online === 'number') {
+        failCount = 0;
+        setOnline(data.online);
+      }
     } catch(_) {
-      // Network error — silently keep last value
+      failCount++;
+      // If API keeps failing (e.g. local file open, no server), show 1
+      if (failCount >= 2) setOnline(1);
     }
   }
 
   async function leave() {
-    // Use sendBeacon for reliability on page unload
     const payload = JSON.stringify({ sessionId: SESSION_ID, action: 'leave' });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon('/api/online', new Blob([payload], { type: 'application/json' }));
-    } else {
-      fetch('/api/online', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
-    }
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/online', new Blob([payload], { type: 'application/json' }));
+      } else {
+        fetch('/api/online', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+      }
+    } catch(_) {}
   }
 
-  // Boot
   heartbeat();
   const hbTimer = setInterval(heartbeat, HEARTBEAT);
-
   window.addEventListener('beforeunload', () => { clearInterval(hbTimer); leave(); });
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) leave();
-    else heartbeat();
+    if (document.hidden) leave(); else heartbeat();
   });
 </script>
 </body>
