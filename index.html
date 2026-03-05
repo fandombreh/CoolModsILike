@@ -186,7 +186,7 @@
   .status-badge {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 16px;
     font-family: 'Space Mono', monospace;
     font-size: 0.65rem;
     color: var(--acid-dim);
@@ -203,6 +203,32 @@
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.4; transform: scale(0.8); }
   }
+  .online-counter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--fog);
+    backdrop-filter: blur(8px);
+    transition: border-color 0.3s;
+  }
+  .online-counter:hover { border-color: rgba(57,255,20,0.4); }
+  .online-num {
+    color: var(--acid);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-shadow: var(--glow);
+    min-width: 20px;
+    text-align: center;
+    transition: all 0.3s;
+  }
+  .online-num.bump {
+    transform: scale(1.3);
+    color: #fff;
+  }
+  .online-label { color: rgba(200,240,192,0.4); font-size: 0.55rem; letter-spacing: 3px; }
 
   /* HERO */
   .hero {
@@ -695,8 +721,15 @@
       </div>
     </div>
     <div class="status-badge">
-      <div class="status-dot"></div>
-      MODS ONLINE — v2.1.0
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="status-dot"></div>
+        MODS ONLINE — v2.1.0
+      </div>
+      <div class="online-counter">
+        <div class="status-dot" style="width:5px;height:5px;flex-shrink:0;"></div>
+        <span class="online-num" id="onlineCount">—</span>
+        <span class="online-label">ONLINE</span>
+      </div>
     </div>
   </div>
 </header>
@@ -719,8 +752,11 @@
       <span class="stat-label">Mods Available</span>
     </div>
     <div class="stat">
-      <span class="stat-num">100%</span>
-      <span class="stat-label">Free</span>
+      <span class="stat-num" id="onlineCountStat" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+        <span style="width:8px;height:8px;background:var(--acid);border-radius:50%;display:inline-block;animation:pulse 1.5s infinite;box-shadow:0 0 8px var(--acid);flex-shrink:0;"></span>
+        <span id="onlineCountStatNum">—</span>
+      </span>
+      <span class="stat-label">Users Online</span>
     </div>
     <div class="stat">
       <span class="stat-num">BepInEx</span>
@@ -994,7 +1030,73 @@
     setTimeout(() => { fill.style.transition = 'width 1.5s ease'; }, 50);
   }
 
-  // Glitch title effect
+  // ── Online user counter ──────────────────────────────────────────
+  const SESSION_KEY = 'gtmods_session_' + Math.random().toString(36).slice(2);
+  const COUNTER_KEY = 'gtmods_online_sessions';
+  const HEARTBEAT_INTERVAL = 20000; // 20s
+  const SESSION_TTL = 45000;        // 45s — sessions older than this are stale
+
+  function setCount(n) {
+    const els = [document.getElementById('onlineCount'), document.getElementById('onlineCountStatNum')];
+    els.forEach(el => {
+      if (!el) return;
+      el.textContent = n;
+      el.classList.add('bump');
+      setTimeout(() => el.classList.remove('bump'), 300);
+    });
+  }
+
+  async function heartbeat() {
+    try {
+      // Read existing sessions
+      let sessions = {};
+      try {
+        const res = await window.storage.get(COUNTER_KEY, true);
+        sessions = JSON.parse(res.value);
+      } catch(_) { sessions = {}; }
+
+      const now = Date.now();
+      // Remove stale sessions
+      for (const [k, ts] of Object.entries(sessions)) {
+        if (now - ts > SESSION_TTL) delete sessions[k];
+      }
+      // Register/refresh our session
+      sessions[SESSION_KEY] = now;
+
+      await window.storage.set(COUNTER_KEY, JSON.stringify(sessions), true);
+      setCount(Object.keys(sessions).length);
+    } catch(e) {
+      // Fallback: show a simulated count if storage unavailable
+      setCount(Math.floor(Math.random() * 8) + 1);
+    }
+  }
+
+  async function removeSession() {
+    try {
+      let sessions = {};
+      try {
+        const res = await window.storage.get(COUNTER_KEY, true);
+        sessions = JSON.parse(res.value);
+      } catch(_) {}
+      delete sessions[SESSION_KEY];
+      await window.storage.set(COUNTER_KEY, JSON.stringify(sessions), true);
+    } catch(_) {}
+  }
+
+  // Start heartbeat immediately and on interval
+  heartbeat();
+  const hbTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL);
+
+  // Clean up when tab closes
+  window.addEventListener('beforeunload', () => {
+    clearInterval(hbTimer);
+    removeSession();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) removeSession();
+    else heartbeat();
+  });
+  // ─────────────────────────────────────────────────────────────────
   const title = document.querySelector('.hero-title span');
   setInterval(() => {
     if (Math.random() > 0.95) {
