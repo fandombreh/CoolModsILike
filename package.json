@@ -1,0 +1,8 @@
+{
+  "name": "gt-mods",
+  "version": "1.0.0",
+  "description": "Gorilla Tag Mod Hub",
+  "dependencies": {
+    "@vercel/kv": "^1.0.0"
+  }
+}
